@@ -48,6 +48,9 @@ api-smoke-create:
 api-smoke-patch:
 	bash ./scripts/smoke-api-patch.sh
 
+api-smoke-stats:
+	bash ./scripts/smoke-api-stats.sh
+
 api-test:
 	node ./apps/api-gateway/scripts/test-api.mjs
 

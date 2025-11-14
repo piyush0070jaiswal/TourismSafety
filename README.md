@@ -57,3 +57,12 @@ make ml-health
 # Start web in dev mode
 make web
 ```
+
+start server
+```
+cd apps/api-gateway && npm start
+```
+on a new terminal
+```
+cd apps/web && npm run dev
+```

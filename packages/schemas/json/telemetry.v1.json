@@ -1,19 +1,40 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://example.com/schemas/telemetry.v1.json",
   "title": "Telemetry v1",
+  "description": "IoT wearable/device telemetry payload (v1). Optional fields validate only when present. Keep this backward compatible.",
   "type": "object",
   "properties": {
-    "deviceId": { "type": "string", "format": "uuid" },
-    "ts": { "type": "string", "format": "date-time" },
-    "lat": { "type": "number" },
-    "lon": { "type": "number" },
-    "hr": { "type": "integer" },
-    "accel": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
-    "sos": { "type": "boolean" },
-    "battery": { "type": "number" },
-    "sig": { "type": "string" }
+    "deviceId": { "type": "string", "format": "uuid", "description": "Device UUID" },
+    "ts": { "type": "string", "format": "date-time", "description": "ISO8601 timestamp (UTC)" },
+    "lat": { "type": "number", "minimum": -90, "maximum": 90, "description": "Latitude in decimal degrees (-90..90)" },
+    "lon": { "type": "number", "minimum": -180, "maximum": 180, "description": "Longitude in decimal degrees (-180..180)" },
+    "hr": { "type": "integer", "minimum": 0, "maximum": 260, "description": "Heart rate in bpm (0..260). Optional." },
+    "accel": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Acceleration vector [x,y,z]. Units implementation-defined. Optional."
+    },
+    "sos": { "type": "boolean", "description": "SOS event flag. Optional." },
+    "battery": { "type": "number", "minimum": 0, "maximum": 1, "description": "Battery level (0..1). Optional." },
+    "sig": { "type": "string", "pattern": "^[A-Za-z0-9+/=]+$", "description": "Base64 signature over payload. Optional." }
   },
   "required": ["deviceId", "ts", "lat", "lon"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "See /.github/instructions/AIinstructions.instructions.md (IoT Gateway section) for contracts and topics.",
+  "examples": [
+    {
+      "deviceId": "550e8400-e29b-41d4-a716-446655440000",
+      "ts": "2025-09-19T12:34:56.789Z",
+      "lat": 19.076,
+      "lon": 72.8777,
+      "hr": 108,
+      "accel": [0.01, 1.02, -0.03],
+      "sos": false,
+      "battery": 0.56,
+      "sig": "MEUCIQDN...=="
+    }
+  ]
 }

@@ -1,0 +1,50 @@
+name: CI - Schemas and Shared
+
+on:
+  push:
+    branches: [ main, better ]
+    paths:
+      - 'packages/shared/**'
+      - 'packages/schemas/**'
+      - '.github/workflows/ci-schemas.yml'
+  pull_request:
+    branches: [ main, better ]
+    paths:
+      - 'packages/shared/**'
+      - 'packages/schemas/**'
+      - '.github/workflows/ci-schemas.yml'
+
+concurrency:
+  group: ci-schemas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shared-and-schemas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run shared tests
+        run: pnpm --filter @sih/shared test
+
+      - name: Validate telemetry schema with sample
+        run: pnpm --filter @sih/shared schema:validate:telemetry
+
+      - name: Validate telemetry JSONL samples
+        run: pnpm --filter @sih/shared schema:validate:telemetry:jsonl

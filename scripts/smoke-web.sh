@@ -3,15 +3,25 @@ set -euo pipefail
 
 WEB_URL="${WEB_URL:-http://localhost:${PORT:-3037}}"
 
-echo "[web] healthz => $WEB_URL/healthz"
-code=$(curl -sS -o /dev/null -w '%{http_code}' "$WEB_URL/healthz" || true)
-echo "HTTP $code"
+check() {
+  local url="$1" name="$2" follow="${3:-no}"
+  local args=(-sS -o /dev/null -w '%{http_code}')
+  if [[ "$follow" == "yes" ]]; then args=(-L "${args[@]}"); fi
+  echo "[web] $name => $url"; local code
+  code=$(curl "${args[@]}" "$url" || true)
+  echo "HTTP $code"; [[ "$code" == "200" ]]
+}
 
-echo "[web] dashboard/incidents => $WEB_URL/dashboard/incidents"
-code2=$(curl -sS -o /dev/null -w '%{http_code}' "$WEB_URL/dashboard/incidents" || true)
-echo "HTTP $code2"
+ok=1
 
-if [[ "$code" != "200" || "$code2" != "200" ]]; then
+check "$WEB_URL/healthz" "healthz" || ok=0
+check "$WEB_URL/" "home" || ok=0
+check "$WEB_URL/dashboard/incidents" "dashboard/incidents" || ok=0
+check "$WEB_URL/tourist/report" "tourist/report" || ok=0
+check "$WEB_URL/tourist/id-demo" "tourist/id-demo" || ok=0
+check "$WEB_URL/report" "report redirect" yes || ok=0
+
+if [[ "$ok" -ne 1 ]]; then
   echo "Smoke failed" >&2
   exit 1
 fi

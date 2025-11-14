@@ -213,6 +213,78 @@ router.get('/export', (req: Request, res: Response) => {
     });
 });
 
+// Lightweight stats endpoint: returns counts by status and severity using the same filters
+router.get('/stats', async (req: Request, res: Response) => {
+  const status = (Array.isArray(req.query.status) ? req.query.status : (req.query.status ? [req.query.status] : [])) as string[];
+  const severity = (Array.isArray(req.query.severity) ? req.query.severity : (req.query.severity ? [req.query.severity] : [])) as string[];
+  const createdBefore = typeof req.query.created_before === 'string' ? new Date(req.query.created_before) : null;
+  const createdAfter = typeof req.query.created_after === 'string' ? new Date(req.query.created_after) : null;
+  const bboxStr = typeof req.query.bbox === 'string' ? req.query.bbox : null; // minLon,minLat,maxLon,maxLat
+  let bbox: [number, number, number, number] | null = null;
+  if (bboxStr) {
+    const parts = bboxStr.split(',').map((n) => Number(n.trim()));
+    if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+      const [minLon, minLat, maxLon, maxLat] = parts as [number, number, number, number];
+      if (minLon <= maxLon && minLat <= maxLat) bbox = [minLon, minLat, maxLon, maxLat];
+    }
+  }
+
+  // Demo mode
+  if (!AppDataSource.isInitialized) {
+    res.set('x-demo-mode', 'true');
+    const { items } = filterAndPageDemo(demoItems, { status, severity, createdBefore, createdAfter, bbox, limit: 1000 });
+    const byStatus: Record<string, number> = {};
+    const bySeverity: Record<string, number> = {};
+    for (const i of items) {
+      byStatus[i.status] = (byStatus[i.status] || 0) + 1;
+      bySeverity[i.severity] = (bySeverity[i.severity] || 0) + 1;
+    }
+    return res.json({ total: items.length, byStatus, bySeverity });
+  }
+
+  try {
+    // Build where conditions similar to list endpoint
+    const repo = AppDataSource.getRepository(Incident);
+    const qb = repo.createQueryBuilder('i');
+    if (status.length) qb.andWhere('i.status = ANY(:status)', { status });
+    if (severity.length) qb.andWhere('i.severity = ANY(:severity)', { severity });
+    if (createdBefore && !isNaN(createdBefore.getTime())) qb.andWhere('i.created_at < :cursor', { cursor: createdBefore.toISOString() });
+    if (createdAfter && !isNaN(createdAfter.getTime())) qb.andWhere('i.created_at >= :after', { after: createdAfter.toISOString() });
+    if (bbox) {
+      const [minLon, minLat, maxLon, maxLat] = bbox;
+      qb.andWhere('i.lon BETWEEN :minLon AND :maxLon AND i.lat BETWEEN :minLat AND :maxLat', {
+        minLon,
+        maxLon,
+        minLat,
+        maxLat,
+      });
+    }
+
+    // Clone query builder for two groupings
+    const byStatusRows = await qb.clone().select('i.status', 'status').addSelect('COUNT(*)', 'cnt').groupBy('i.status').getRawMany();
+    const bySeverityRows = await qb.clone().select('i.severity', 'severity').addSelect('COUNT(*)', 'cnt').groupBy('i.severity').getRawMany();
+    const totalRow = await qb.clone().select('COUNT(*)', 'cnt').getRawOne();
+
+    const byStatus: Record<string, number> = {};
+    for (const r of byStatusRows as any[]) byStatus[r.status] = Number(r.cnt);
+    const bySeverity: Record<string, number> = {};
+    for (const r of bySeverityRows as any[]) bySeverity[r.severity] = Number(r.cnt);
+    const total = Number((totalRow as any)?.cnt ?? 0);
+    return res.json({ total, byStatus, bySeverity });
+  } catch (_e) {
+    // Fallback to demo on DB errors
+    res.set('x-demo-mode', 'true');
+    const { items } = filterAndPageDemo(demoItems, { status, severity, createdBefore, createdAfter, bbox, limit: 1000 });
+    const byStatus: Record<string, number> = {};
+    const bySeverity: Record<string, number> = {};
+    for (const i of items) {
+      byStatus[i.status] = (byStatus[i.status] || 0) + 1;
+      bySeverity[i.severity] = (bySeverity[i.severity] || 0) + 1;
+    }
+    return res.json({ total: items.length, byStatus, bySeverity });
+  }
+});
+
 // Get single incident by ID
 router.get('/:id', async (req: Request, res: Response) => {
   const id = String(req.params.id);

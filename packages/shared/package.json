@@ -11,9 +11,14 @@
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "codegen": "node scripts/codegen.js || true"
+    "codegen": "node scripts/codegen.js || true",
+    "schema:validate:telemetry": "node scripts/validate-telemetry.mjs ../schemas/json/examples/telemetry.sample.json",
+    "schema:generate:telemetry": "node scripts/generate-telemetry.mjs 20 ../schemas/json/examples/telemetry.generated.jsonl",
+    "schema:validate:telemetry:jsonl": "node scripts/validate-telemetry-jsonl.mjs ../schemas/json/examples/telemetry.samples.jsonl"
   },
   "devDependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }

@@ -2,15 +2,15 @@ applyTo: '**'
 
 #if something is complex, don't do it as the first hackathon is near and we need a working prototype as fast as possible {for example a feature that is complex to implement, just build it for the show, not the actual feature}
 
-version: '0.2.0'
-lastUpdated: '2025-09-11'
+version: '0.3.0'
+lastUpdated: '2025-09-19'
 owners:
   - platform-team
 reviewCadence: 'bi-weekly'
 changeLogFile: '/docs/CHANGELOG.md'
 adrDir: '/docs/adrs'
 ---
-Provide project context and coding guidelines that AI should follow when generating code, answering questions, or reviewing changes.
+Provide project context and coding guidelines that AI should follow when generating code, answering questions, or reviewing changes. Keep this pragmatic and aligned to this repo’s current stack and ports.
 
 
 # SIH Safety Platform — AIinstructions (Expanded, Implementation-Ready)
@@ -26,6 +26,12 @@ This is a step-by-step, implementation-ready execution plan for building the SIH
 - Database design and data contracts aligned to frontend UX and backend services
 
 Follow this file as your “source of truth” doc for repos, architecture, endpoints, data models, and deployment.
+
+Repo quick facts (local dev)
+- Web (Next.js dev): http://localhost:3037
+- API Gateway (Express): http://localhost:4000
+- ML Serving (FastAPI): http://localhost:8000
+- If a page is “not reachable,” first verify the correct web port (3037) and free ports with `make ports-kill` before restarting.
 
 ---
 
@@ -385,6 +391,7 @@ LIMIT $limit OFFSET $offset;
 - Tailwind CSS with class strategy OR Chakra UI; Next Themes for dark mode
 - React Query for data fetching/caching; Axios or Fetch with interceptors
 - Env: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_WS_URL, NEXT_PUBLIC_MAPBOX_TOKEN
+  - In this repo, NEXT_PUBLIC_API_URL can be omitted; web falls back to http://localhost:4000 and shows API status in header.
 
 5.2 Folder Structure
 ```
@@ -412,6 +419,65 @@ apps/web
   - save user preference in localStorage and to backend profile (PUT /users/me/preferences)
 - Contrast & accessibility:
   - Ensure WCAG AA color contrast; test both themes with Storybook a11y
+
+5.3.1 Vibrant UI & Link Integrity (this repo)
+- Use existing CSS tokens in `apps/web/app/layout.tsx` to keep a vivid but accessible palette (primary #2563eb, success #10b981, danger #ef4444).
+- Ensure header links return 200: `/`, `/dashboard/incidents`, `/tourist/report`, `/tourist/id-demo`.
+- Keep `/report` -> `/tourist/report` redirect.
+- Buttons: 6px radius, solid primary for main actions, neutral outline for secondary; visible focus states.
+- Report page: “Use my location” must update the mini map and auto-fill lat/lon; provide manual lat/lon inputs with clamping.
+- Add small, non-blocking enhancements only; avoid risky UI rewrites before demos.
+
+5.3.2 Multi-palette theme system (repo-adapted)
+- Scope: Only touch `apps/web` (Next.js App Router). Do not modify backend services or API contracts. Prefer additive CSS and small components over refactors.
+- Core CSS variables: Define semantic tokens at a single source (RootLayout or a global CSS). In this repo, keep the existing inline CSS in `apps/web/app/layout.tsx` and extend it with variables:
+  - At minimum: `--color-bg`, `--color-surface`, `--color-primary`, `--color-accent`, `--color-secondary`, `--color-on-primary`, `--color-on-surface`, `--color-muted`, `--color-border`, `--shadow-small`, `--shadow-medium`, `--transition-fast`, `--transition-medium`, `--radius-md`.
+- Theme classes: Provide 4 palettes as CSS classes on `<html>`: `.theme-teal` (default), `.theme-sunset`, `.theme-indigo`, `.theme-mint`. Each overrides the same variables. Keep `.dark` support as-is; theme classes should work in both modes where possible.
+- Utilities (additive): Introduce lightweight utility classes consumed by existing pages without renaming current classes/ids. Keep them in a small global CSS injected from `layout.tsx` or a new `apps/web/app/globals.css` if desired.
+  - Buttons: `.btn`, `.btn--primary`, `.btn--secondary`, `.btn--ghost`
+  - Helpers: `.text-muted`, `.card`, `.chip`, `.badge`, `.icon`
+  - Micro interactions: focus-visible outline; subtle hover elevation; respect `prefers-reduced-motion`.
+- Theme switcher (client-only): Add a tiny utility (e.g., `apps/web/components/ThemePaletteToggle.tsx`) that applies CSS variable maps at runtime and persists choice in `localStorage` under `site-theme`. Keep separate from the existing dark mode toggle.
+  - `applyTheme(name)` updates CSS variables on `document.documentElement` or toggles `.theme-xxx` classes; restore selection from `localStorage` on mount.
+  - Provide a small menu (footer or header) to switch between the 4 palettes; keep UI unobtrusive.
+- Safe replacements: When encountering hardcoded colors in JSX inline styles within `apps/web`, prefer replacing with variables via classNames. Avoid renaming any element IDs or data-* attributes.
+- Icons: Ensure icons use `currentColor` or `.icon { color: var(--color-muted) }` so palette changes flow through.
+
+Palettes (reference values)
+- Teal Breeze (`.theme-teal`, default)
+  - `--color-primary: #0ea5a4; --color-accent: #06b6d4; --color-secondary: #ffb020; --color-bg: #F8FBFC; --color-surface: #FFFFFF; --color-on-primary: #ffffff; --color-muted: #6b7280; --color-border: rgba(2,8,23,0.06); --color-success: #16a34a; --color-error: #ef4444;`
+- Sunset Coral (`.theme-sunset`)
+  - `--color-primary: #ff6b6b; --color-accent: #ff9f43; --color-secondary: #7c3aed; --color-bg: #fff9f8; --color-surface: #ffffff; --color-on-primary: #ffffff; --color-muted: #6b7280; --color-border: rgba(15,23,42,0.06);`
+- Vivid Indigo (`.theme-indigo`)
+  - `--color-primary: #5b21b6; --color-accent: #06b6d4; --color-secondary: #7c3aed; --color-bg: #f7f7ff; --color-surface: #ffffff; --color-on-primary: #ffffff; --color-muted: #4b5563;`
+- Mint Lime (`.theme-mint`)
+  - `--color-primary: #16a34a; --color-accent: #34d399; --color-secondary: #0891b2; --color-bg: #f6fffa; --color-surface: #ffffff; --color-on-primary: #ffffff; --color-muted: #374151;`
+- Optional shades if needed: define `--color-primary-600` and `--color-primary-400` as fixed hexes or computed via `color-mix` for hover/focus variants.
+
+Component mapping (how to apply)
+- Buttons: use `var(--color-primary)` and `var(--color-on-primary)`. On hover, optional linear-gradient with `--color-accent`.
+- Nav/Sidebar: background `var(--color-surface)`, active accents with `--color-primary`, subtle hover tint via `color-mix` to avoid heavy backgrounds.
+- Cards: `var(--color-surface)` + `var(--color-border)` + `var(--shadow-small)`; hover elevates to `var(--shadow-medium)`.
+- Forms: focus ring from `--color-primary` with soft spread; error `--color-error`; success `--color-success`.
+- Tables: header subtle tint; row hover slightly darker surface; borders from `--color-border`.
+- Chips/Badges: use `color-mix(in srgb, var(--color-primary) 12%, var(--color-surface))` for soft chips.
+
+Accessibility & performance
+- Maintain minimum contrast (4.5:1 text, 3:1 large text). If a palette variant fails, darken `--color-primary` or adjust `--color-on-primary`.
+- Respect `prefers-reduced-motion`; disable transitions where set.
+- Keep transitions short (≤240ms). Avoid expensive shadows on large lists.
+
+QA & acceptance (UI themes)
+- Acceptance:
+  - Theme switcher toggles across 4 palettes and persists after reload.
+  - Buttons and cards render consistently across pages (home, dashboard/incidents, tourist/report, tourist/id-demo).
+  - No broken IDs or data-* attributes; navigation and forms unaffected.
+- QA checklist:
+  - Keyboard navigation: focus-visible outlines present.
+  - Visual contrast checks on key pages.
+  - Test widths: 360, 375, 768, 1024, 1440.
+  - Verify SVG icons honor `currentColor`.
+  - Smoke links: `/`, `/healthz`, `/dashboard/incidents`, `/tourist/report`, `/tourist/id-demo`, `/report` (redirect).
 
 5.4 Auth & Route Protection
 - OIDC redirect flow; receive tokens in callback page
@@ -804,12 +870,14 @@ LIMIT 50;
 
 Functional
 - Incident creation with media visible on dashboard within 2s (p95)
+ - Header nav links all navigate and return 200 (home, dashboard incidents, report, ID demo)
 - Wearable SOS triggers authority push within 3s (p95)
 - Evidence integrity verifiable: sha256 match and on-chain anchor reference present within 2h
 
 Non-Functional
 - API p95 latency < 300ms
-- WebSocket reconnect < 3s with missed events replay (since last seq)
+ - Web dev server reachable at http://localhost:3037; /healthz returns 200
+ - WebSocket reconnect < 3s with missed events replay (since last seq)
 - Mobile offline: queued report submits automatically within 30s of reconnect
 
 Security/Privacy
@@ -834,18 +902,30 @@ Steps
 5) pnpm -C apps/api-gateway dev
 6) pnpm -C apps/web dev
 7) pnpm -C apps/ml-serving dev
-8) Open http://localhost:3000 (web), http://localhost:4000 (api), http://localhost:8000 (ml)
+8) Open http://localhost:3037 (web), http://localhost:4000 (api), http://localhost:8000 (ml)
 
 Smoke tests
-- POST /auth/login (use Keycloak test realm)
-- Create incident via web; see it on dashboard map
-- Publish telemetry to MQTT topic and observe alert
+- Web: /healthz returns 200; header links work
+- API: /healthz returns {status:"ok", demo: <bool>}
+- Create incident via web; see it on dashboard list/map (or demo entries)
 
 Tips
 - Use Turbo to run all dev servers in parallel:
   - pnpm turbo run dev --parallel --filter=api-gateway --filter=web --filter=ml-serving
 - Makefile optional: `make dev`, `make stop`, `make seed`. Document in /docs/runbooks.md.
 - If schemas change, run `pnpm -w codegen` to regenerate clients and docs.
+
+Troubleshooting (dev)
+- If the site is “not reachable,” first free ports and restart clean:
+  - make ports-kill
+  - make up-reset WEB_PORT=3037
+- Health probes:
+  - make api-health (expects 200)
+  - make web-health (expects 200)
+- Start minimal background servers if you don’t need health checks:
+  - make up
+- Clear stale Next.js cache if UI behaves oddly:
+  - make web-reset
 
 ---
 
@@ -910,6 +990,13 @@ H) Sample CI workflows (high-level)
 - pr.yml: setup PNPM cache -> turbo lint/type/test -> codegen -> verify docs/schemas -> build affected.
 - release.yml: changesets version -> tag -> build images -> push registry -> publish packages.
 - security.yml: semgrep, trivy, secret scanning; upload SARIF.
+
+I) Agent operating rules (this repo)
+- Keep changes low-risk and additive; prioritize working demo over complex features near hackathon.
+- Use concise progress updates; after 3–5 file edits or tool actions, summarize deltas and what’s next.
+- When planning multi-step work, maintain a lightweight todo list and keep exactly one item in-progress.
+- Don’t block on missing details—assume 1–2 reasonable defaults aligned to this repo; call out assumptions.
+- Validate with quick smoke checks (web and api /healthz) after changes that affect runtime.
 
 ---
 
